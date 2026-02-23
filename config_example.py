@@ -22,16 +22,17 @@ YANDEX_MUSIC_TOKEN = "your_yandex_token_here"
 # Получить можно в Spotify Developer Dashboard:
 # 1. Перейдите на https://developer.spotify.com/dashboard/
 # 2. Создайте новое приложение
-# 3. Добавьте Redirect URI: http://localhost:8888/callback
+# 3. Добавьте Redirect URI: http://127.0.0.1:8888/callback
+#    (Spotify не принимает localhost — используйте 127.0.0.1)
 SPOTIFY_CLIENT_ID = "your_spotify_client_id_here"
 SPOTIFY_CLIENT_SECRET = "your_spotify_client_secret_here"
-SPOTIFY_REDIRECT_URI = "http://localhost:8888/callback"
+SPOTIFY_REDIRECT_URI = "http://127.0.0.1:8888/callback"
 
 # Альтернативно, можно задать через переменные окружения:
 # export YANDEX_MUSIC_TOKEN="your_token"
 # export SPOTIFY_CLIENT_ID="your_client_id"
 # export SPOTIFY_CLIENT_SECRET="your_client_secret"
-# export SPOTIFY_REDIRECT_URI="http://localhost:8888/callback"
+# export SPOTIFY_REDIRECT_URI="http://127.0.0.1:8888/callback"
 
 def setup_environment():
     """Устанавливает переменные окружения из этого файла"""

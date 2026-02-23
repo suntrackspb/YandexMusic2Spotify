@@ -28,7 +28,7 @@
    - Перейдите в [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/)
    - Нажмите "Create an App"
    - Заполните название и описание
-   - В настройках приложения добавьте **Redirect URI**: `http://localhost:8888/callback`
+   - В настройках приложения добавьте **Redirect URI**: `http://127.0.0.1:8888/callback` (Spotify не принимает localhost)
    - Скопируйте **Client ID** и **Client Secret**
 
 ## ⚙️ Настройка
@@ -38,7 +38,7 @@
 export YANDEX_MUSIC_TOKEN="ваш_токен_яндекс_музыки"
 export SPOTIFY_CLIENT_ID="ваш_spotify_client_id"
 export SPOTIFY_CLIENT_SECRET="ваш_spotify_client_secret"
-export SPOTIFY_REDIRECT_URI="http://localhost:8888/callback"
+export SPOTIFY_REDIRECT_URI="http://127.0.0.1:8888/callback"
 ```
 
 ### Вариант 2: Файл конфигурации

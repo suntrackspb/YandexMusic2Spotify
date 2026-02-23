@@ -429,7 +429,7 @@ def main():
     yandex_token = os.getenv('YANDEX_MUSIC_TOKEN')
     spotify_client_id = os.getenv('SPOTIFY_CLIENT_ID')
     spotify_client_secret = os.getenv('SPOTIFY_CLIENT_SECRET')
-    spotify_redirect_uri = os.getenv('SPOTIFY_REDIRECT_URI', 'http://localhost:8888/callback')
+    spotify_redirect_uri = os.getenv('SPOTIFY_REDIRECT_URI', 'http://127.0.0.1:8888/callback')
     
     # Если нет переменных окружения, просим ввести
     if not yandex_token:
@@ -444,7 +444,7 @@ def main():
         print("\nДля работы со Spotify нужно создать приложение:")
         print("1. Перейдите на https://developer.spotify.com/dashboard/")
         print("2. Создайте новое приложение")
-        print("3. Добавьте Redirect URI: http://localhost:8888/callback")
+        print("3. Добавьте Redirect URI: http://127.0.0.1:8888/callback")
         
         if not spotify_client_id:
             spotify_client_id = input("Введите Spotify Client ID: ").strip()
