@@ -132,7 +132,9 @@ dmypy.json
 config.py
 
 # Результаты работы скрипта
+yandex_liked_tracks.json
 not_found_tracks.json
+update_not_found_tracks_*.json
 *.mp3
 *.wav
 *.m4a
