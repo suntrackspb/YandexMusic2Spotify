@@ -9,6 +9,7 @@
 ⚠️ Запускайте этот скрипт С ВПН — доступ к Яндекс Музыке на этом шаге не требуется.
 """
 
+import argparse
 import json
 import re
 import time
@@ -218,7 +219,8 @@ class PlaylistUpdater(MusicTransfer):
             return False
 
     def update_playlist_from_yandex(self, yandex_tracks: List[Dict], playlist_name: str,
-                                  create_if_not_exists: bool = False) -> bool:
+                                  create_if_not_exists: bool = False,
+                                  dry_run: bool = False) -> bool:
         """
         Основной метод обновления плейлиста из Яндекс Музыки
 
@@ -226,11 +228,15 @@ class PlaylistUpdater(MusicTransfer):
             yandex_tracks: Треки из Яндекс Музыки (загруженные из JSON)
             playlist_name: Название плейлиста в Spotify для обновления
             create_if_not_exists: Создать плейлист если не существует
+            dry_run: Если True, только ищет треки и выводит статистику,
+                     не создавая и не изменяя плейлист в Spotify
 
         Returns:
             True если успешно обновлен, False иначе
         """
         print("🔄 Начинаем обновление плейлиста...")
+        if dry_run:
+            print("🧪 Режим dry-run: плейлист не будет создан/изменен")
 
         if not yandex_tracks:
             print("❌ Список треков из Яндекс Музыки пуст")
@@ -263,11 +269,15 @@ class PlaylistUpdater(MusicTransfer):
                     time.sleep(0.1)
 
                 if spotify_uris:
-                    self.create_spotify_playlist(
-                        name=playlist_name,
-                        tracks=spotify_uris,
-                        description=f"Плейлист создан и синхронизирован с Яндекс Музыкой"
-                    )
+                    if dry_run:
+                        print(f"\n🧪 Dry-run: плейлист '{playlist_name}' НЕ создан")
+                        print(f"📊 Найдено {len(spotify_uris)}/{len(yandex_tracks)} треков в Spotify")
+                    else:
+                        self.create_spotify_playlist(
+                            name=playlist_name,
+                            tracks=spotify_uris,
+                            description=f"Плейлист создан и синхронизирован с Яндекс Музыкой"
+                        )
 
                     if not_found_tracks:
                         self._save_not_found_tracks(not_found_tracks)
@@ -310,11 +320,18 @@ class PlaylistUpdater(MusicTransfer):
             time.sleep(0.1)
 
         if new_spotify_uris:
-            success = self.update_spotify_playlist(playlist['id'], new_spotify_uris)
+            if dry_run:
+                print(f"\n🧪 Dry-run: плейлист НЕ изменен")
+                success = True
+            else:
+                success = self.update_spotify_playlist(playlist['id'], new_spotify_uris)
 
             if success:
-                print(f"\n🎉 Плейлист успешно обновлен!")
-                print(f"📊 Статистика обновления:")
+                if dry_run:
+                    print(f"📊 Статистика (dry-run):")
+                else:
+                    print(f"\n🎉 Плейлист успешно обновлен!")
+                    print(f"📊 Статистика обновления:")
                 print(f"   • Треков было в плейлисте: {len(spotify_tracks)}")
                 print(f"   • Новых треков найдено: {len(new_spotify_uris)}")
                 print(f"   • Треков стало в плейлисте: {len(spotify_tracks) + len(new_spotify_uris)}")
@@ -383,6 +400,13 @@ class PlaylistUpdater(MusicTransfer):
 
 def main():
     """Основная функция для запуска обновления плейлиста"""
+    parser = argparse.ArgumentParser(description="Обновление плейлиста Spotify из Яндекс Музыки")
+    parser.add_argument(
+        '--dry-run', action='store_true',
+        help="Только найти треки в Spotify и вывести статистику, не создавая и не изменяя плейлист"
+    )
+    args = parser.parse_args()
+
     print("🔄 Шаг 2/2: Обновление плейлиста Spotify из Яндекс Музыки")
     print("=" * 50)
 
@@ -408,7 +432,8 @@ def main():
             updater.update_playlist_from_yandex(
                 yandex_tracks=yandex_tracks,
                 playlist_name=playlist_name,
-                create_if_not_exists=True
+                create_if_not_exists=True,
+                dry_run=args.dry_run
             )
         else:
             print("👋 Операция отменена")

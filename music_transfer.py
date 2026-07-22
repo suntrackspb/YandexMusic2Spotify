@@ -9,6 +9,7 @@
    доступ к Яндекс Музыке на этом шаге уже не требуется.
 """
 
+import argparse
 import json
 import time
 from typing import List, Dict, Optional
@@ -165,15 +166,20 @@ class MusicTransfer:
             raise
 
     def transfer_playlist(self, yandex_tracks: List[Dict],
-                         playlist_name: str = "Мне нравится (из Яндекс Музыки)"):
+                         playlist_name: str = "Мне нравится (из Яндекс Музыки)",
+                         dry_run: bool = False):
         """
         Основной метод переноса плейлиста
 
         Args:
             yandex_tracks: Треки из Яндекс Музыки (загруженные из JSON)
             playlist_name: Название плейлиста в Spotify
+            dry_run: Если True, только ищет треки и выводит статистику,
+                     не создавая плейлист в Spotify
         """
         print("🚀 Начинаем перенос плейлиста...")
+        if dry_run:
+            print("🧪 Режим dry-run: плейлист создан не будет")
 
         if not yandex_tracks:
             print("❌ Список треков из Яндекс Музыки пуст")
@@ -200,13 +206,16 @@ class MusicTransfer:
             time.sleep(0.1)
 
         if spotify_tracks:
-            self.create_spotify_playlist(
-                name=playlist_name,
-                tracks=spotify_tracks,
-                description=f"Перенесено из Яндекс Музыки. Найдено: {len(spotify_tracks)}/{len(yandex_tracks)} треков"
-            )
+            if dry_run:
+                print(f"\n🧪 Dry-run: плейлист '{playlist_name}' НЕ создан")
+            else:
+                self.create_spotify_playlist(
+                    name=playlist_name,
+                    tracks=spotify_tracks,
+                    description=f"Перенесено из Яндекс Музыки. Найдено: {len(spotify_tracks)}/{len(yandex_tracks)} треков"
+                )
+                print(f"\n🎉 Плейлист успешно создан!")
 
-            print(f"\n🎉 Плейлист успешно создан!")
             print(f"📊 Статистика:")
             print(f"   • Всего треков в Яндекс Музыке: {len(yandex_tracks)}")
             print(f"   • Найдено в Spotify: {len(spotify_tracks)}")
@@ -227,6 +236,13 @@ class MusicTransfer:
 
 def main():
     """Основная функция"""
+    parser = argparse.ArgumentParser(description="Перенос плейлиста из Яндекс Музыки в Spotify")
+    parser.add_argument(
+        '--dry-run', action='store_true',
+        help="Только найти треки в Spotify и вывести статистику, не создавая плейлист"
+    )
+    args = parser.parse_args()
+
     print("🎵 Шаг 2/2: Перенос плейлиста из Яндекс Музыки в Spotify")
     print("=" * 50)
 
@@ -246,7 +262,7 @@ def main():
             spotify_redirect_uri=spotify_redirect_uri
         )
 
-        transfer.transfer_playlist(yandex_tracks)
+        transfer.transfer_playlist(yandex_tracks, dry_run=args.dry_run)
 
     except Exception as e:
         print(f"❌ Критическая ошибка: {e}")

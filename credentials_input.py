@@ -15,10 +15,12 @@ def get_yandex_token() -> str:
 
     if not yandex_token:
         print("Получите токен Яндекс Музыки:")
-        print("1. Перейдите на https://music.yandex.ru/")
-        print("2. Откройте инструменты разработчика (F12)")
-        print("3. Перейдите в Network -> найдите любой запрос к music-web.yandex.net")
-        print("4. Скопируйте значение заголовка Authorization")
+        print("1. Откройте DevTools (F12), вкладка Network, включите Preserve log")
+        print("2. Перейдите по ссылке:")
+        print("   https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d")
+        print("3. В фильтре запросов введите: auth?")
+        print("4. Найдите запрос вида auth?external-domain=music.yandex.ru...")
+        print("5. На вкладке Headers найдите X-Retpath-Y и скопируйте значение access_token= из него")
         yandex_token = input("Введите токен Яндекс Музыки: ").strip()
 
     return yandex_token
