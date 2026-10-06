@@ -101,16 +101,16 @@ jobs:
         # windowed-сборка не имеет консоли: ждем процесс и читаем код возврата,
         # а отчет забираем из selftest.log.
         run: |
-          $exe = "dist\$env:APP_NAME\$env:APP_NAME.exe"
+          $exe = "dist\$env:APP_NAME.exe"
           $proc = Start-Process -FilePath $exe -ArgumentList '--selftest' -Wait -PassThru -NoNewWindow
           if (Test-Path selftest.log) { Get-Content selftest.log }
           if ($proc.ExitCode -ne 0) { throw "selftest failed with exit code $($proc.ExitCode)" }
 
       - name: Package (Windows)
         if: matrix.platform == 'windows'
+        # onefile: публикуем сам exe, без zip
         run: |
-          Compress-Archive -Path "dist\$env:APP_NAME\*" `
-            -DestinationPath "dist\$env:APP_NAME-$env:VERSION-windows.zip"
+          Move-Item "dist\$env:APP_NAME.exe" "dist\$env:APP_NAME-$env:VERSION-windows.exe"
 
       # ---------------------------------------------------------------- Linux
       - name: Install build tooling (Linux)
@@ -201,6 +201,7 @@ jobs:
           path: |
             dist/*.zip
             dist/*.deb
+            dist/*.exe
           if-no-files-found: error
 
   release:

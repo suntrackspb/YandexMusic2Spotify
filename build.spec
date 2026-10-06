@@ -62,11 +62,7 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
+exe_options = dict(
     name=APP_NAME,
     debug=False,
     bootloader_ignore_signals=False,
@@ -81,15 +77,15 @@ exe = EXE(
     icon=icon,
 )
 
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=False,
-    upx_exclude=[],
-    name=APP_NAME,
-)
+if sys.platform == "win32":
+    # Windows: один exe (onefile). Распаковка во временную папку при запуске
+    # заодно снимает «метку интернета» с DLL — иначе .NET/pythonnet может
+    # молча отказаться их грузить из распакованного Проводником zip.
+    exe = EXE(pyz, a.scripts, a.binaries, a.datas, [], runtime_tmpdir=None, **exe_options)
+else:
+    # macOS: .app — и так один объект, onefile внутри бандла не нужен
+    exe = EXE(pyz, a.scripts, [], exclude_binaries=True, **exe_options)
+    coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, upx_exclude=[], name=APP_NAME)
 
 if sys.platform == "darwin":
     app = BUNDLE(

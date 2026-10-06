@@ -40,6 +40,9 @@ def selftest() -> int:
         problems.append(f"FAIL pywebview js assets missing: {webview_js}")
 
     check(f"gui backend {gui.GUI_BACKEND}", lambda: __import__(f"webview.platforms.{gui.GUI_BACKEND}") and None)
+    if sys.platform == "win32":
+        # Загружает .NET и Python.Runtime.dll — именно это ломается на Windows
+        check("pythonnet clr", lambda: __import__("clr") and None)
     check("yandex_music", lambda: __import__("yandex_music").__version__)
     check("spotipy", lambda: __import__("spotipy") and None)
     check("matching", lambda: __import__("ym2sp.sync") and None)
@@ -75,9 +78,24 @@ def main() -> None:
     if args.selftest:
         sys.exit(selftest())
 
-    from ym2sp.gui import run
+    from ym2sp.logs import log, setup_logging, show_fatal_error
 
-    run(debug=args.debug)
+    setup_logging()
+    log.info("Запуск, platform=%s, frozen=%s", sys.platform, getattr(sys, "frozen", False))
+    try:
+        from ym2sp.gui import run
+
+        run(debug=args.debug)
+    except Exception as exc:
+        log.exception("Не удалось запустить приложение")
+        hint = ""
+        if sys.platform == "win32":
+            hint = (
+                "\n\nПроверьте, что установлен Microsoft Edge WebView2 Runtime:\n"
+                "https://developer.microsoft.com/microsoft-edge/webview2/"
+            )
+        show_fatal_error(f"Не удалось запустить приложение:\n{exc}{hint}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

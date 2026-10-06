@@ -7,7 +7,6 @@ import subprocess
 import sys
 import threading
 import time
-import traceback
 import webbrowser
 from pathlib import Path
 from typing import Any, Callable
@@ -15,6 +14,7 @@ from typing import Any, Callable
 import webview
 
 from . import __version__
+from .logs import log
 from .models import Cancelled
 from .settings import (
     DATA_DIR,
@@ -89,7 +89,7 @@ class Api:
             self._log(f"❌ {e}", "error")
             self._emit("error", message=str(e))
         except Exception as e:
-            traceback.print_exc()
+            log.exception("Ошибка в задаче %s", name)
             self._log(f"❌ Непредвиденная ошибка: {e}", "error")
             self._emit("error", message=str(e))
         finally:
@@ -237,4 +237,12 @@ def run(debug: bool = False) -> None:
         min_size=(860, 600),
     )
     api._window = window
+
+    shown = threading.Event()
+    window.events.shown += shown.set
+    log.info("pywebview %s, backend %s", getattr(webview, "__version__", "?"), GUI_BACKEND)
     webview.start(gui=GUI_BACKEND, icon=str(ICON_FILE), debug=debug)
+    # Если бэкенд не смог инициализироваться, pywebview иногда просто
+    # возвращает управление без окна и без исключения
+    if not shown.is_set():
+        raise RuntimeError(f"Окно не было создано (бэкенд {GUI_BACKEND})")
