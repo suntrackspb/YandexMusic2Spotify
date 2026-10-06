@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yandex Music → Spotify</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <img class="logo" src="icon.png" alt="">
+    <h1>Yandex Music → Spotify</h1>
+  </div>
+  <div class="topbar-actions">
+    <button class="ghost" id="btn-data">Папка данных</button>
+    <button class="ghost" id="btn-settings">Настройки</button>
+  </div>
+</header>
+
+<main class="layout">
+  <aside class="sidebar">
+    <section class="card" id="card-yandex">
+      <div class="card-head">
+        <span class="step">1</span>
+        <h2>Яндекс Музыка</h2>
+      </div>
+      <p class="hint warn">ВПН должен быть <b>выключен</b> — Яндекс блокирует доступ из-за рубежа.</p>
+      <dl class="facts">
+        <dt>Аккаунт</dt><dd id="ya-account">—</dd>
+        <dt>Треков</dt><dd id="ya-count">—</dd>
+        <dt>Обновлено</dt><dd id="ya-date">—</dd>
+      </dl>
+      <button class="primary" id="btn-fetch">Загрузить лайки</button>
+    </section>
+
+    <section class="card" id="card-spotify">
+      <div class="card-head">
+        <span class="step">2</span>
+        <h2>Spotify</h2>
+      </div>
+      <p class="hint">Если Spotify недоступен в вашем регионе — включите ВПН.</p>
+      <div class="row between">
+        <span>Аккаунт: <b id="sp-user">не подключен</b></span>
+        <button class="link" id="btn-logout" hidden>Выйти</button>
+      </div>
+      <button class="secondary" id="btn-connect">Подключить Spotify</button>
+
+      <fieldset id="sync-form" disabled>
+        <div class="segmented">
+          <label><input type="radio" name="mode" value="new" checked><span>Новый плейлист</span></label>
+          <label><input type="radio" name="mode" value="existing"><span>Обновить существующий</span></label>
+        </div>
+
+        <div data-mode="new">
+          <label class="field">Название
+            <input type="text" id="playlist-name" value="Мне нравится (из Яндекс Музыки)">
+          </label>
+          <label class="check"><input type="checkbox" id="opt-public"> Публичный плейлист</label>
+        </div>
+
+        <div data-mode="existing" hidden>
+          <label class="field">Плейлист
+            <div class="row">
+              <select id="playlist-select"></select>
+              <button class="icon" id="btn-refresh" title="Обновить список">↻</button>
+            </div>
+          </label>
+          <label class="check"><input type="checkbox" id="opt-top" checked> Новые треки — в начало плейлиста</label>
+        </div>
+
+        <label class="check"><input type="checkbox" id="opt-cache" checked> Использовать найденные ранее совпадения</label>
+        <label class="check"><input type="checkbox" id="opt-dry"> Пробный запуск (ничего не менять)</label>
+
+        <button class="primary" id="btn-sync">Перенести</button>
+      </fieldset>
+    </section>
+  </aside>
+
+  <section class="content">
+    <div class="card progress-card">
+      <div class="row between">
+        <span id="progress-text" class="muted">Готов к работе</span>
+        <button class="danger small" id="btn-cancel" hidden>Отменить</button>
+      </div>
+      <div class="progress"><div class="bar" id="progress-bar"></div></div>
+    </div>
+
+    <div class="card stats" id="stats" hidden>
+      <div class="stat"><b id="st-total">0</b><span>всего</span></div>
+      <div class="stat ok"><b id="st-added">0</b><span id="st-added-label">добавлено</span></div>
+      <div class="stat info"><b id="st-exists">0</b><span>уже были</span></div>
+      <div class="stat muted"><b id="st-duplicate">0</b><span>дубликаты</span></div>
+      <div class="stat warn"><b id="st-not_found">0</b><span>не найдено</span></div>
+      <div class="stat err"><b id="st-error">0</b><span>ошибки</span></div>
+    </div>
+
+    <div class="card panel">
+      <nav class="tabs">
+        <button class="tab active" data-tab="log">Журнал</button>
+        <button class="tab" data-tab="results">Результаты <span class="badge" id="results-badge" hidden></span></button>
+      </nav>
+
+      <div class="tab-body" id="tab-log">
+        <ol class="log" id="log"></ol>
+      </div>
+
+      <div class="tab-body" id="tab-results" hidden>
+        <div class="row filters">
+          <div class="chips" id="filter-chips">
+            <button class="chip active" data-filter="all">Все</button>
+            <button class="chip" data-filter="added">Добавлено</button>
+            <button class="chip" data-filter="exists">Уже были</button>
+            <button class="chip" data-filter="duplicate">Дубликаты</button>
+            <button class="chip" data-filter="not_found">Не найдено</button>
+            <button class="chip" data-filter="error">Ошибки</button>
+          </div>
+          <input type="search" id="filter-text" placeholder="Поиск…">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Статус</th><th>Яндекс Музыка</th><th>Spotify</th></tr></thead>
+            <tbody id="results-body"></tbody>
+          </table>
+          <p class="empty" id="results-empty">Результатов пока нет</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog id="settings-dialog">
+  <form method="dialog" id="settings-form">
+    <h2>Настройки</h2>
+
+    <h3>Яндекс Музыка</h3>
+    <label class="field">Токен
+      <input type="password" name="yandex_token" autocomplete="off">
+    </label>
+    <details class="howto">
+      <summary>Как получить токен</summary>
+      <ol>
+        <li>Откройте DevTools (F12), вкладка Network, включите Preserve log.</li>
+        <li>Перейдите по <a href="#" data-open="https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d">ссылке авторизации</a>.</li>
+        <li>В фильтре запросов введите <code>auth?</code> и найдите запрос <code>auth?external-domain=music.yandex.ru…</code></li>
+        <li>В заголовке <code>X-Retpath-Y</code> скопируйте значение <code>access_token=</code>.</li>
+      </ol>
+    </details>
+
+    <h3>Spotify</h3>
+    <label class="field">Client ID
+      <input type="text" name="spotify_client_id" autocomplete="off">
+    </label>
+    <label class="field">Client Secret
+      <input type="password" name="spotify_client_secret" autocomplete="off">
+    </label>
+    <label class="field">Redirect URI
+      <input type="text" name="spotify_redirect_uri">
+    </label>
+    <details class="howto">
+      <summary>Как создать приложение Spotify</summary>
+      <ol>
+        <li>Откройте <a href="#" data-open="https://developer.spotify.com/dashboard/">Spotify Developer Dashboard</a> и создайте приложение (Web API).</li>
+        <li>Добавьте Redirect URI <code>http://127.0.0.1:8888/callback</code> — точно такой же, как в поле выше.</li>
+        <li>Скопируйте Client ID и Client Secret.</li>
+      </ol>
+    </details>
+
+    <label class="check"><input type="checkbox" id="show-secrets"> Показать секреты</label>
+    <p class="form-error" id="settings-error"></p>
+
+    <div class="row end">
+      <button type="button" class="ghost" id="settings-cancel">Отмена</button>
+      <button type="submit" class="primary" value="save">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>
