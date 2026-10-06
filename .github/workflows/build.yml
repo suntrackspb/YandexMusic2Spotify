@@ -1,0 +1,222 @@
+name: Build and draft release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch: {}
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  APP_NAME: YandexMusic2Spotify
+  PKG_NAME: yandexmusic2spotify
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: macos-arm64
+          # Intel-раннеры GitHub (macos-13) подолгу стоят в очереди —
+          # x86_64-сборку делаем локально: pyinstaller --noconfirm --clean build.spec
+          # - os: macos-13
+          #   platform: macos-x86_64
+          - os: windows-latest
+            platform: windows
+          - os: ubuntu-24.04
+            platform: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Linux собирается поверх системного python3 (см. шаги ниже),
+      # чтобы вендоренные колеса совпадали с интерпретатором из Depends.
+      - uses: actions/setup-python@v5
+        if: matrix.platform != 'linux'
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Determine version
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=0.0.0-dev" >> "$GITHUB_ENV"
+          fi
+
+      # ---------------------------------------------------------------- macOS
+      - name: Install dependencies (macOS)
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Build (macOS)
+        if: startsWith(matrix.platform, 'macos')
+        run: pyinstaller --noconfirm --clean build.spec
+
+      - name: Ad-hoc sign (macOS)
+        if: startsWith(matrix.platform, 'macos')
+        # Без подписи Gatekeeper объявляет скачанный .app «поврежденным».
+        run: |
+          codesign --force --deep --sign - "dist/${APP_NAME}.app"
+          codesign --verify --deep --strict --verbose=2 "dist/${APP_NAME}.app"
+
+      - name: Smoke test (macOS)
+        if: startsWith(matrix.platform, 'macos')
+        run: "dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME} --selftest"
+
+      - name: Package (macOS)
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          cd dist
+          ditto -c -k --sequesterRsrc --keepParent "${APP_NAME}.app" \
+            "${APP_NAME}-${VERSION}-${{ matrix.platform }}.zip"
+
+      # -------------------------------------------------------------- Windows
+      - name: Install dependencies (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Build (Windows)
+        if: matrix.platform == 'windows'
+        run: pyinstaller --noconfirm --clean build.spec
+
+      - name: Smoke test (Windows)
+        if: matrix.platform == 'windows'
+        # windowed-сборка не имеет консоли: ждем процесс и читаем код возврата,
+        # а отчет забираем из selftest.log.
+        run: |
+          $exe = "dist\$env:APP_NAME\$env:APP_NAME.exe"
+          $proc = Start-Process -FilePath $exe -ArgumentList '--selftest' -Wait -PassThru -NoNewWindow
+          if (Test-Path selftest.log) { Get-Content selftest.log }
+          if ($proc.ExitCode -ne 0) { throw "selftest failed with exit code $($proc.ExitCode)" }
+
+      - name: Package (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          Compress-Archive -Path "dist\$env:APP_NAME\*" `
+            -DestinationPath "dist\$env:APP_NAME-$env:VERSION-windows.zip"
+
+      # ---------------------------------------------------------------- Linux
+      - name: Install build tooling (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3-pip python3-gi python3-gi-cairo gir1.2-gtk-3.0 \
+            gir1.2-webkit2-4.1 xvfb
+
+      - name: Package (deb)
+        if: matrix.platform == 'linux'
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          PKG_ROOT=deb-root
+          APP_DIR="$PKG_ROOT/opt/$PKG_NAME"
+          ARCH="$(dpkg --print-architecture)"
+          # Колеса вендорим ТЕМ ЖЕ python3, который указан в Depends.
+          PY_MINOR="$(/usr/bin/python3 -c 'import sys; print(sys.version_info[1])')"
+
+          mkdir -p "$PKG_ROOT/DEBIAN" "$APP_DIR" \
+            "$PKG_ROOT/usr/bin" "$PKG_ROOT/usr/share/applications" \
+            "$PKG_ROOT/usr/share/icons/hicolor/256x256/apps"
+
+          /usr/bin/python3 -m pip install --no-compile --break-system-packages \
+            --target "$APP_DIR/vendor" -r requirements.txt
+          cp main.py "$APP_DIR/"
+          cp -r ym2sp "$APP_DIR/"
+          find "$APP_DIR" -name '__pycache__' -prune -exec rm -rf {} +
+          cp ym2sp/assets/icon-256.png "$PKG_ROOT/usr/share/icons/hicolor/256x256/apps/$PKG_NAME.png"
+
+          cat > "$PKG_ROOT/usr/bin/$PKG_NAME" <<'LAUNCHER'
+          #!/bin/sh
+          # Без GPU render node (виртуалки без 3D-ускорения, headless)
+          # WebKitGTK падает или показывает пустое окно — отключаем DMABUF и композитинг.
+          # Явно заданное пользователем значение не трогаем.
+          if [ -z "${WEBKIT_DISABLE_DMABUF_RENDERER:-}" ] &&
+             { [ ! -e /dev/dri/renderD128 ] || systemd-detect-virt -q 2>/dev/null; }; then
+              WEBKIT_DISABLE_DMABUF_RENDERER=1
+              WEBKIT_DISABLE_COMPOSITING_MODE=1
+              export WEBKIT_DISABLE_DMABUF_RENDERER WEBKIT_DISABLE_COMPOSITING_MODE
+          fi
+
+          export PYTHONPATH="/opt/yandexmusic2spotify/vendor${PYTHONPATH:+:$PYTHONPATH}"
+          exec python3 -B /opt/yandexmusic2spotify/main.py "$@"
+          LAUNCHER
+          sh -n "$PKG_ROOT/usr/bin/$PKG_NAME"
+          chmod 755 "$PKG_ROOT/usr/bin/$PKG_NAME"
+
+          printf '%s\n' \
+            '[Desktop Entry]' \
+            'Type=Application' \
+            'Name=Yandex Music → Spotify' \
+            'Comment=Перенос «Мне нравится» из Яндекс Музыки в Spotify' \
+            "Exec=$PKG_NAME" \
+            "Icon=$PKG_NAME" \
+            'Categories=AudioVideo;Audio;Utility;' \
+            'Terminal=false' \
+            > "$PKG_ROOT/usr/share/applications/$PKG_NAME.desktop"
+
+          printf '%s\n' \
+            "Package: $PKG_NAME" \
+            "Version: $VERSION" \
+            'Section: sound' \
+            'Priority: optional' \
+            "Architecture: $ARCH" \
+            "Depends: python3 (>= 3.${PY_MINOR}), python3-gi, python3-gi-cairo, gir1.2-gtk-3.0, gir1.2-webkit2-4.1 | gir1.2-webkit2-4.0" \
+            'Maintainer: suntrackspb' \
+            'Description: Transfer liked tracks from Yandex Music to Spotify' \
+            > "$PKG_ROOT/DEBIAN/control"
+
+          dpkg-deb --root-owner-group --build "$PKG_ROOT" \
+            "dist/${APP_NAME}-${VERSION}-linux-${ARCH}.deb"
+          dpkg-deb --info "dist/${APP_NAME}-${VERSION}-linux-${ARCH}.deb"
+
+      - name: Smoke test (Linux, installs the real .deb)
+        if: matrix.platform == 'linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y ./dist/*.deb
+          xvfb-run -a "$PKG_NAME" --selftest
+
+      # --------------------------------------------------------------- upload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.platform }}
+          path: |
+            dist/*.zip
+            dist/*.deb
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          fail_on_unmatched_files: true
+          files: artifacts/*
