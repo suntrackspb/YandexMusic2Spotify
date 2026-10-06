@@ -43,6 +43,17 @@ def selftest() -> int:
     if sys.platform == "win32":
         # Загружает .NET и Python.Runtime.dll — именно это ломается на Windows
         check("pythonnet clr", lambda: __import__("clr") and None)
+
+        def load_icon_like_winforms():
+            # Тот же вызов, что делает pywebview: невалидная иконка роняет процесс
+            import clr
+
+            clr.AddReference("System.Drawing")
+            from System.Drawing import Icon
+
+            Icon(str(gui.ICON_FILE)).Dispose()
+
+        check("window icon loads in System.Drawing", load_icon_like_winforms)
     check("yandex_music", lambda: __import__("yandex_music").__version__)
     check("spotipy", lambda: __import__("spotipy") and None)
     check("matching", lambda: __import__("ym2sp.sync") and None)

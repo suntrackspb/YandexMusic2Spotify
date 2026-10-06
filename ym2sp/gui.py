@@ -31,7 +31,9 @@ from .yandex import YandexError, YandexService, load_library, save_library
 PACKAGE_DIR = Path(__file__).resolve().parent
 WEB_DIR = PACKAGE_DIR / "web"
 INDEX_FILE = WEB_DIR / "index.html"
-ICON_FILE = PACKAGE_DIR / "assets" / "icon.png"
+# WinForms грузит иконку через System.Drawing.Icon, который понимает только .ico:
+# PNG там роняет процесс необработанным исключением .NET
+ICON_FILE = PACKAGE_DIR / "assets" / ("icon.ico" if sys.platform == "win32" else "icon.png")
 
 # Явный бэкенд: на Linux в .deb есть только GTK/WebKit2, на Windows — WebView2
 GUI_BACKEND = {"darwin": "cocoa", "win32": "edgechromium"}.get(sys.platform, "gtk")
