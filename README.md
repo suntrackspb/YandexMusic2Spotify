@@ -119,3 +119,7 @@ ym2sp/
 build.spec           сборка PyInstaller (macOS, Windows)
 data/                данные пользователя (в git не попадают)
 ```
+
+## Лицензия
+
+[MIT](LICENSE)
