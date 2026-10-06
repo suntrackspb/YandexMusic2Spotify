@@ -110,7 +110,7 @@ jobs:
         if: matrix.platform == 'windows'
         # exe в zip: браузеры меньше ругаются на скачивание архива
         run: |
-          Compress-Archive -Path "dist\$env:APP_NAME.exe", "dist\$env:APP_NAME-console.exe" `
+          Compress-Archive -Path "dist\$env:APP_NAME.exe" `
             -DestinationPath "dist\$env:APP_NAME-$env:VERSION-windows.zip"
 
       # ---------------------------------------------------------------- Linux

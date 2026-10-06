@@ -4,6 +4,30 @@
 
 ## Установка
 
+Скачайте сборку для своей системы на странице [Releases](https://github.com/suntrackspb/YandexMusic2Spotify/releases/latest).
+
+**macOS (Apple Silicon)** — `YandexMusic2Spotify-<версия>-macos-arm64.zip`
+
+Распакуйте архив и перенесите `YandexMusic2Spotify.app` в «Программы». Приложение не подписано сертификатом Apple, поэтому при первом запуске macOS его заблокирует. Чтобы открыть, нажмите на приложение правой кнопкой и выберите «Открыть». Если macOS пишет, что приложение повреждено, выполните:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/YandexMusic2Spotify.app
+```
+
+**Windows** — `YandexMusic2Spotify-<версия>-windows.zip`
+
+Распакуйте архив и запустите `YandexMusic2Spotify.exe`. Если SmartScreen покажет предупреждение, нажмите «Подробнее» → «Выполнить в любом случае». Для работы нужен [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/). В Windows 11 он уже установлен, в Windows 10 его иногда нужно поставить.
+
+**Linux (Debian, Ubuntu и производные)** — `YandexMusic2Spotify-<версия>-linux-amd64.deb`
+
+```bash
+sudo apt install ./YandexMusic2Spotify-*-linux-amd64.deb
+```
+
+Приложение появится в меню как «Yandex Music → Spotify». Из терминала его можно запустить командой `yandexmusic2spotify`.
+
+### Запуск из исходников
+
 Нужен Python 3.10 или новее.
 
 ```bash
@@ -60,7 +84,7 @@ python main.py
 | Платформа | Артефакт | Как собирается |
 |---|---|---|
 | macOS (arm64) | `.app` в zip | PyInstaller, ad-hoc подпись |
-| Windows | zip с `.exe` (+ `-console.exe` для диагностики) | PyInstaller onefile, WebView2 |
+| Windows | zip с `.exe` | PyInstaller onefile, WebView2 |
 | Linux | `.deb` | системный python3 + GTK/WebKit2, зависимости в `/opt/yandexmusic2spotify/vendor` |
 
 Каждая сборка проверяется командой `--selftest`: она проверяет ресурсы, бэкенд pywebview и зависимости, не открывая окно.

@@ -82,11 +82,6 @@ if sys.platform == "win32":
     # заодно снимает «метку интернета» с DLL — иначе .NET/pythonnet может
     # молча отказаться их грузить из распакованного Проводником zip.
     exe = EXE(pyz, a.scripts, a.binaries, a.datas, [], runtime_tmpdir=None, **exe_options)
-    # Консольный вариант для диагностики: все ошибки видны в терминале
-    exe_console = EXE(
-        pyz, a.scripts, a.binaries, a.datas, [], runtime_tmpdir=None,
-        **(exe_options | {"name": f"{APP_NAME}-console", "console": True}),
-    )
 else:
     # macOS: .app — и так один объект, onefile внутри бандла не нужен
     exe = EXE(pyz, a.scripts, [], exclude_binaries=True, **exe_options)
