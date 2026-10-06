@@ -60,7 +60,7 @@ python main.py
 | Платформа | Артефакт | Как собирается |
 |---|---|---|
 | macOS (arm64) | `.app` в zip | PyInstaller, ad-hoc подпись |
-| Windows | один `.exe` | PyInstaller onefile, WebView2 |
+| Windows | zip с `.exe` (+ `-console.exe` для диагностики) | PyInstaller onefile, WebView2 |
 | Linux | `.deb` | системный python3 + GTK/WebKit2, зависимости в `/opt/yandexmusic2spotify/vendor` |
 
 Каждая сборка проверяется командой `--selftest`: она проверяет ресурсы, бэкенд pywebview и зависимости, не открывая окно.

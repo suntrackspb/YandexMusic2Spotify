@@ -108,9 +108,10 @@ jobs:
 
       - name: Package (Windows)
         if: matrix.platform == 'windows'
-        # onefile: публикуем сам exe, без zip
+        # exe в zip: браузеры меньше ругаются на скачивание архива
         run: |
-          Move-Item "dist\$env:APP_NAME.exe" "dist\$env:APP_NAME-$env:VERSION-windows.exe"
+          Compress-Archive -Path "dist\$env:APP_NAME.exe", "dist\$env:APP_NAME-console.exe" `
+            -DestinationPath "dist\$env:APP_NAME-$env:VERSION-windows.zip"
 
       # ---------------------------------------------------------------- Linux
       - name: Install build tooling (Linux)
@@ -201,7 +202,6 @@ jobs:
           path: |
             dist/*.zip
             dist/*.deb
-            dist/*.exe
           if-no-files-found: error
 
   release:

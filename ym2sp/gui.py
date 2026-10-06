@@ -8,6 +8,7 @@ import sys
 import threading
 import time
 import webbrowser
+from importlib import metadata
 from pathlib import Path
 from typing import Any, Callable
 
@@ -240,8 +241,23 @@ def run(debug: bool = False) -> None:
 
     shown = threading.Event()
     window.events.shown += shown.set
-    log.info("pywebview %s, backend %s", getattr(webview, "__version__", "?"), GUI_BACKEND)
-    webview.start(gui=GUI_BACKEND, icon=str(ICON_FILE), debug=debug)
+    try:
+        webview_version = metadata.version("pywebview")
+    except metadata.PackageNotFoundError:
+        webview_version = "?"
+    storage = DATA_DIR / "webview"
+    storage.mkdir(parents=True, exist_ok=True)
+    log.info("pywebview %s, backend %s, storage %s", webview_version, GUI_BACKEND, storage)
+    # Явная постоянная папка профиля WebView2: с приватным режимом и временным
+    # профилем по умолчанию WebView2 на Windows может падать без сообщений
+    webview.start(
+        gui=GUI_BACKEND,
+        icon=str(ICON_FILE),
+        debug=debug,
+        private_mode=False,
+        storage_path=str(storage),
+    )
+    log.info("Окно закрыто")
     # Если бэкенд не смог инициализироваться, pywebview иногда просто
     # возвращает управление без окна и без исключения
     if not shown.is_set():
