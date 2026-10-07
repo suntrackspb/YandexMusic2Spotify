@@ -2,6 +2,8 @@
 
 Десктопное приложение для переноса плейлиста «Мне нравится» из Яндекс Музыки в Spotify. Может создать новый плейлист или дописать недостающие треки в существующий.
 
+> Старая консольная версия без графического интерфейса сохранена в ветке [`legacy-cli`](https://github.com/suntrackspb/YandexMusic2Spotify/tree/legacy-cli).
+
 ## Установка
 
 Скачайте сборку для своей системы на странице [Releases](https://github.com/suntrackspb/YandexMusic2Spotify/releases/latest).
