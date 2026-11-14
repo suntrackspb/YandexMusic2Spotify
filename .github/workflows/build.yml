@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             platform: macos-arm64
           # Intel-раннеры GitHub (macos-13) подолгу стоят в очереди —
           # x86_64-сборку делаем локально: pyinstaller --noconfirm --clean build.spec
