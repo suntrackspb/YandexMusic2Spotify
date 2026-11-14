@@ -208,7 +208,7 @@ window.app = {
 function openSettings(creds) {
   const form = $("settings-form");
   for (const [key, value] of Object.entries(creds)) {
-    if (form.elements[key]) form.elements[key].value = value || "";
+    if (form.elements[key]) form.elements[key].value = value ?? "";
   }
   $("settings-error").textContent = "";
   $("settings-dialog").showModal();
@@ -218,7 +218,7 @@ async function saveSettings(event) {
   event.preventDefault();
   const form = $("settings-form");
   const data = Object.fromEntries(
-    ["yandex_token", "spotify_client_id", "spotify_client_secret", "spotify_redirect_uri"]
+    ["yandex_token", "spotify_client_id", "spotify_client_secret", "spotify_redirect_uri", "spotify_request_delay"]
       .map((k) => [k, form.elements[k].value])
   );
   const res = await api().save_settings(data);

@@ -23,6 +23,7 @@ from .settings import (
     load_credentials,
     save_credentials,
     validate_redirect_uri,
+    validate_spotify_delay,
 )
 from .spotify import SpotifyError, SpotifyService
 from .sync import SyncOptions, run_sync
@@ -115,12 +116,20 @@ class Api:
         }
 
     def save_settings(self, data: dict) -> dict:
-        creds = Credentials(**{k: str(data.get(k, "")).strip() for k in Credentials().to_dict()})
+        creds = Credentials(**{k: str(data.get(k, "")).strip() for k in Credentials().to_dict() if k != "spotify_request_delay"})
+        try:
+            creds.spotify_request_delay = validate_spotify_delay(data.get("spotify_request_delay", 1.0))
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        if self._job and self._job.is_alive():
+            return {"ok": False, "error": "Дождитесь завершения операции перед изменением настроек"}
         error = validate_redirect_uri(creds.spotify_redirect_uri)
         if error:
             return {"ok": False, "error": error}
         old = load_credentials()
         save_credentials(creds)
+        if self._spotify:
+            self._spotify.request_delay = creds.spotify_request_delay
         if (old.spotify_client_id, old.spotify_client_secret) != (creds.spotify_client_id, creds.spotify_client_secret):
             self._spotify = None
             SpotifyService.logout()
@@ -148,7 +157,7 @@ class Api:
     def connect_spotify(self) -> dict:
         def job():
             self._log("🔑 Авторизация в Spotify (при первом входе откроется браузер)…")
-            self._spotify = SpotifyService(load_credentials())
+            self._spotify = SpotifyService(load_credentials(), should_cancel=self._cancel.is_set)
             self._log(f"✅ Spotify: {self._spotify.display_name}", "success")
             self._emit("spotify", user=self._spotify.display_name, playlists=self._spotify.editable_playlists())
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import math
 import os
 import sys
 from dataclasses import asdict, dataclass
@@ -54,6 +55,8 @@ class Credentials:
     spotify_client_secret: str = ""
     spotify_redirect_uri: str = DEFAULT_REDIRECT_URI
 
+    spotify_request_delay: float = 1.0
+
     @property
     def has_yandex(self) -> bool:
         return bool(self.yandex_token)
@@ -62,7 +65,7 @@ class Credentials:
     def has_spotify(self) -> bool:
         return bool(self.spotify_client_id and self.spotify_client_secret)
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -92,7 +95,7 @@ def _load_legacy_config() -> dict[str, str]:
 
 def load_credentials() -> Credentials:
     """Собирает учетные данные. Приоритет (по возрастанию): окружение, config.py, data/settings.json."""
-    values: dict[str, str] = {}
+    values: dict[str, Any] = {}
 
     for field, (env, _) in _SOURCES.items():
         value = os.getenv(env, "").strip()
@@ -104,6 +107,12 @@ def load_credentials() -> Credentials:
     stored = read_json(SETTINGS_FILE, {})
     if isinstance(stored, dict):
         values.update({k: str(v).strip() for k, v in stored.items() if k in _SOURCES and str(v).strip()})
+
+    if isinstance(stored, dict):
+        try:
+            values["spotify_request_delay"] = validate_spotify_delay(stored.get("spotify_request_delay", 1.0))
+        except ValueError:
+            pass
 
     creds = Credentials(**values)
     if not creds.spotify_redirect_uri:
@@ -145,3 +154,13 @@ def write_json(path: Path, data: Any) -> None:
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(tmp, path)
+
+
+def validate_spotify_delay(value: Any) -> float:
+    try:
+        delay = float(value)
+    except (TypeError, ValueError):
+        raise ValueError("Задержка Spotify должна быть числом от 0 до 60 секунд") from None
+    if not math.isfinite(delay) or not 0 <= delay <= 60:
+        raise ValueError("Задержка Spotify должна быть числом от 0 до 60 секунд")
+    return delay

@@ -187,6 +187,8 @@ def _resolve(
     else:
         try:
             found, score = spotify.search(track)
+        except Cancelled:
+            raise
         except spotipy.SpotifyException as e:
             return TrackResult(track, ERROR, error=e.msg or str(e))
         except Exception as e:  # сеть, таймауты

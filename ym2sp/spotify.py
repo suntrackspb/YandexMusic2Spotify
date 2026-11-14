@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterator
+import time
+from typing import Any, Callable, Iterator
 
 import spotipy
 from spotipy.cache_handler import CacheFileHandler
 from spotipy.oauth2 import SpotifyOAuth
 
 from .matching import CONFIDENT_SCORE, base_title, best_match
-from .models import SpotifyTrack, YandexTrack
+from .models import Cancelled, SpotifyTrack, YandexTrack
 from .settings import SPOTIFY_TOKEN_CACHE, Credentials, validate_redirect_uri
 
 SCOPES = " ".join([
@@ -32,7 +33,10 @@ def _clean(text: str) -> str:
 
 
 class SpotifyService:
-    def __init__(self, creds: Credentials):
+    def __init__(self, creds: Credentials, should_cancel: Callable[[], bool] = lambda: False):
+        self.request_delay = creds.spotify_request_delay
+        self._should_cancel = should_cancel
+        self._last_request_finished: float | None = None
         if not creds.has_spotify:
             raise SpotifyError("Не заданы Client ID / Client Secret Spotify (вкладка «Настройки»)")
         error = validate_redirect_uri(creds.spotify_redirect_uri)
@@ -57,13 +61,28 @@ class SpotifyService:
             backoff_factor=1.0,
         )
         try:
-            self.user = self.sp.current_user()
+            self.user = self._call(self.sp.current_user)
         except spotipy.SpotifyException as e:
             raise SpotifyError(f"Ошибка авторизации Spotify: {e.msg or e}") from e
         except spotipy.oauth2.SpotifyOauthError as e:
             raise SpotifyError(f"Ошибка авторизации Spotify: {e}. Проверьте Client ID/Secret и Redirect URI") from e
         self.user_id = self.user["id"]
         self.display_name = self.user.get("display_name") or self.user_id
+
+    def _call(self, fn, *args, **kwargs):
+        """Пауза после предыдущего вызова API, прерываемая отменой."""
+        while True:
+            if self._should_cancel():
+                raise Cancelled()
+            remaining = (self.request_delay - (time.monotonic() - self._last_request_finished)
+                         if self._last_request_finished is not None else 0)
+            if remaining <= 0:
+                break
+            time.sleep(min(remaining, 0.1))
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            self._last_request_finished = time.monotonic()
 
     @staticmethod
     def logout() -> None:
@@ -72,7 +91,7 @@ class SpotifyService:
     def _paginate(self, page: dict | None) -> Iterator[dict]:
         while page:
             yield from page.get("items") or []
-            page = self.sp.next(page) if page.get("next") else None
+            page = self._call(self.sp.next, page) if page.get("next") else None
 
     # --- Поиск ---
 
@@ -96,7 +115,7 @@ class SpotifyService:
         best, best_score = None, 0.0
         seen: set[str] = set()
         for query in self._queries(track):
-            result = self.sp.search(q=query, type="track", limit=SEARCH_LIMIT)
+            result = self._call(self.sp.search, q=query, type="track", limit=SEARCH_LIMIT)
             items = [i for i in (result.get("tracks") or {}).get("items") or [] if i and i.get("uri")]
             candidates = [SpotifyTrack.from_api(i) for i in items if i["uri"] not in seen]
             seen.update(c.uri for c in candidates)
@@ -112,7 +131,7 @@ class SpotifyService:
     def editable_playlists(self) -> list[dict[str, Any]]:
         """Только плейлисты, которые пользователь может изменять (свои и совместные)."""
         playlists = []
-        for p in self._paginate(self.sp.current_user_playlists(limit=50)):
+        for p in self._paginate(self._call(self.sp.current_user_playlists, limit=50)):
             if not p:
                 continue
             owner = (p.get("owner") or {}).get("id")
@@ -129,7 +148,7 @@ class SpotifyService:
 
     def playlist_tracks(self, playlist_id: str) -> list[SpotifyTrack]:
         tracks = []
-        page = self.sp.playlist_items(playlist_id, limit=100, additional_types=("track",))
+        page = self._call(self.sp.playlist_items, playlist_id, limit=100, additional_types=("track",))
         for item in self._paginate(page):
             data = item.get("track") or item.get("item")
             if not data or data.get("type") != "track" or data.get("is_local") or not data.get("id"):
@@ -138,7 +157,7 @@ class SpotifyService:
         return tracks
 
     def create_playlist(self, name: str, public: bool, description: str) -> str:
-        playlist = self.sp.current_user_playlist_create(name, public=public, description=description[:300])
+        playlist = self._call(self.sp.current_user_playlist_create, name, public=public, description=description[:300])
         return playlist["id"]
 
     def add_tracks(self, playlist_id: str, uris: list[str], to_top: bool = False) -> None:
@@ -147,7 +166,7 @@ class SpotifyService:
         batches = [uris[i:i + ADD_BATCH] for i in range(0, len(uris), ADD_BATCH)]
         if to_top:
             for batch in reversed(batches):
-                self.sp.playlist_add_items(playlist_id, batch, position=0)
+                self._call(self.sp.playlist_add_items, playlist_id, batch, position=0)
         else:
             for batch in batches:
-                self.sp.playlist_add_items(playlist_id, batch)
+                self._call(self.sp.playlist_add_items, playlist_id, batch)
